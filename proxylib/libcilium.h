@@ -17,7 +17,7 @@ typedef struct { const char *p; ptrdiff_t n; } _GoString_;
 /* Start of preamble from import "C" comments.  */
 
 
-#line 17 "/home/vagrant/go/src/github.com/cilium/cilium/proxylib/proxylib.go"
+#line 17 "/home/john/go/src/github.com/cilium/cilium/proxylib/proxylib.go"
 
 #include "proxylib/types.h"
 
