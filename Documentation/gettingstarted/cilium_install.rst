@@ -4,8 +4,8 @@
     Please use the official rendered version released here:
     http://docs.cilium.io
 
-Step 1: Install Cilium
-======================
+Install Cilium
+==============
 
 The next step is to install Cilium into your Kubernetes cluster.
 Cilium installation leverages the `Kubernetes Daemon Set
