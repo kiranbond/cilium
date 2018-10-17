@@ -33,13 +33,6 @@ Rebel Alliance, this Cassandra demo is Star Wars-themed as well.
 `Memcached <https://memcached.org/>`_ is a high performance, distributed memory object caching system. It's simple yet powerful, benefitting dynamic web applications by alleviating database load.
 
 
-a popular NOSQL database focused on
-delivering high-performance transactions (especially on writes) without sacrificing on availability or scale.
-Cassandra operates as a cluster of servers, and Cassandra clients query these services via a
-the `native Cassandra protocol <https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec>`_ .
-Cilium understands the Cassandra protocol, and thus is able to provide deep visibility and control over
-which clients are able to access particular tables inside a Cassandra cluster, and which actions
-(e.g., "select", "insert", "update", "delete") can be performed on tables.
 
 With Cassandra, each table belongs to a "keyspace", allowing multiple groups to use a single cluster without conflicting.
 Cassandra queries specify the full table name qualified by the keyspace using the syntax "<keyspace>.<table>".
