@@ -26,10 +26,17 @@ complete will help you to get started in your area of choice:
    grpc
    elasticsearch
    cassandra
+   memcached
    mesos
    docker
+
+.. toctree::
+  :hidden:
+
+  cilium_install
+  cilium_install_crio
+  cilium_install_docker
 
 The best way to get help if you get stuck is to ask a question on the `Cilium
 Slack channel <https://cilium.herokuapp.com>`_.  With Cilium contributors
 across the globe, there is almost always someone available to help.
-
