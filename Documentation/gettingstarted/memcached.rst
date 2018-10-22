@@ -92,9 +92,10 @@ We suggest having a main terminal window to execute *kubectl* commands and two a
 
 In **all three** terminal windows, set some handy environment variables for the demo with the following script:
 
-.. parsed-literal::
+.. parsed-literal::x
 
-   $  curl -s \ |SCM_WEB|\/examples/memcd-env.sh | source
+   $  curl -s \ |SCM_WEB|\/examples/kubernetes-memcached/memcd-env.sh > memcd-env.sh
+   $  source memcd-env.sh
 
 
 In the terminal window dedicated for the A-wing pod, exec in, use python to import the binary memcached library and set the client connection to the memcached server:

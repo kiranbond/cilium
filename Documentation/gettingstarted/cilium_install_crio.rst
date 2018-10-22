@@ -8,8 +8,8 @@ Cilium, Kubernetes and CRI-O
 ============================
 
 
-Install Cilium with CRI-O
-=========================
+Step 1: Install Cilium with CRI-O
+=================================
 
 The next step is to install Cilium into your Kubernetes cluster.
 Cilium installation leverages the `Kubernetes Daemon Set

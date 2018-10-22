@@ -7,8 +7,8 @@
 Cilium, Kubernetes and Docker
 =============================
 
-Install Cilium with Docker
-==========================
+Step 1: Install Cilium with Docker
+==================================
 
 The next step is to install Cilium into your Kubernetes cluster.
 Cilium installation leverages the `Kubernetes Daemon Set
