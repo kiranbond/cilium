@@ -144,8 +144,6 @@ var _ = Describe("K8sIstioTest", func() {
 	})
 
 	AfterAll(func() {
-		close(signalChan)
-		ticker.Stop()
 		By("Deleting the Istio resources")
 		_ = kubectl.Delete(istioYAMLPath)
 
@@ -210,7 +208,7 @@ var _ = Describe("K8sIstioTest", func() {
 					for _, ep := range endpointsK8s1 {
 						By("Checking if pod name %s contains %s", ep.Status.ExternalIdentifiers.PodName, pods[0])
 						if strings.Contains(ep.Status.ExternalIdentifiers.PodName, pods[0]) {
-							By("pod name %s contains %s; setting detailsEp with endpoint ID %s", ep.Status.ExternalIdentifiers.PodName, pods[0], ep.ID)
+							By("pod name %s contains %s; setting detailsEp with endpoint ID %d in cilium pod %s", ep.Status.ExternalIdentifiers.PodName, pods[0], ep.ID, ciliumPodK8s1)
 							detailsEp = &ep
 							skipOut = true
 							ciliumPod = ciliumPodK8s1
@@ -219,14 +217,14 @@ var _ = Describe("K8sIstioTest", func() {
 					}
 
 					if skipOut {
-						continue
+						break
 					}
 					var endpointsK8s2 []models.Endpoint
 					_ = kubectl.CiliumEndpointsList(ciliumPodK8s2).Unmarshal(&endpointsK8s2)
 					for _, ep := range endpointsK8s2 {
 						By("Checking if pod name %s contains %s", ep.Status.ExternalIdentifiers.PodName, pods[0])
 						if strings.Contains(ep.Status.ExternalIdentifiers.PodName, pods[0]) {
-							By("pod name %s contains %s; setting detailsEp with endpoint ID %s", ep.Status.ExternalIdentifiers.PodName, pods[0], ep.ID)
+							By("pod name %s contains %s; setting detailsEp with endpoint ID %d in cilium pod %s", ep.Status.ExternalIdentifiers.PodName, pods[0], ep.ID, ciliumPodK8s2)
 							detailsEp = &ep
 							skipOut = true
 							ciliumPod = ciliumPodK8s2
@@ -251,7 +249,7 @@ var _ = Describe("K8sIstioTest", func() {
 						for _, cmd := range cmds {
 							By("Executing command: %s", cmd)
 							res := kubectl.ExecPodCmd(helpers.KubeSystemNamespace, ciliumPod, cmd)
-							fmt.Println(res.GetStdOut())
+							fmt.Println(res.GetDebugMessage())
 						}
 					}
 				}
@@ -309,7 +307,10 @@ var _ = Describe("K8sIstioTest", func() {
 		})
 
 		AfterEach(func() {
+			ticker.Stop()
+			close(signalChan)
 			for _, resourcePath := range resourceYAMLPaths {
+
 				By("Deleting resource in file %q", resourcePath)
 				// Explicitly do not check result to avoid having assertions in AfterEach.
 				_ = kubectl.Delete(resourcePath)
