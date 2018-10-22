@@ -234,7 +234,7 @@ If we then try to perform the attacks from the *X-wing* pod from the main termin
     $ kubectl exec $XWING_POD sh -- -c "echo -en \\"$GETAC\\" | nc memcached-server 11211"
     CLIENT_ERROR access denied
 
-From the A-Wing terminal window, we can confirm that if *A-wing* goes outside of the bounds of its allowed calls, we see:
+From the A-Wing terminal window, we can confirm that if *A-wing* goes outside of the bounds of its allowed calls. You may need to run the ``client.get`` command twice:
 
 .. parsed-literal::
 
