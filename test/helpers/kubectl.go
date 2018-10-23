@@ -350,7 +350,7 @@ func (kub *Kubectl) Logs(namespace string, pod string) *CmdRes {
 // the output to `helpers.monitorLogFileName` file.
 func (kub *Kubectl) MicroscopeStart() (error, func() error) {
 	microscope := "microscope"
-	var microscopeCmd = microscope + "| ts '[%Y-%m-%d %H:%M:%S]'"
+	var microscopeCmd = microscope + " --raw | ts '[%Y-%m-%d %H:%M:%S]'"
 	var cb = func() error { return nil }
 	cmd := fmt.Sprintf("%[1]s -ti -n %[2]s exec %[3]s -- %[4]s",
 		KubectlCmd, KubeSystemNamespace, microscope, microscopeCmd)
@@ -1291,6 +1291,7 @@ func (kub *Kubectl) CiliumPolicyAction(namespace, filepath string, action Resour
 // CiliumReport report the cilium pod to the log and appends the logs for the
 // given commands.
 func (kub *Kubectl) CiliumReport(namespace string, commands ...string) {
+	ginkgoext.By("Generating cilium report")
 	if config.CiliumTestConfig.SkipLogGathering {
 		ginkgoext.GinkgoPrint("Skipped gathering logs (-cilium.skipLogs=true)\n")
 		return
@@ -1382,6 +1383,7 @@ func (kub *Kubectl) CiliumCheckReport() {
 // any pod has a non-zero restart count, the test suite will be marked as having
 // failed.
 func (kub *Kubectl) CheckNoPodRestarts() {
+	ginkgoext.By("Checking that no pod restarts occurred")
 	pods, err := kub.GetAllPods(ExecOptions{SkipLog: true})
 	if err != nil {
 		kub.logger.WithError(err).Error("Unable to get pods from Kubernetes via kubectl")

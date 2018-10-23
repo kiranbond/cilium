@@ -2705,6 +2705,7 @@ func (e *Endpoint) syncPolicyMap() error {
 
 		// If key that is in policy map is not in desired state, just remove it.
 		if _, ok := e.desiredMapState[keyHostOrder]; !ok {
+			e.getLogger().Debug("deleting policyKey: %s", keyHostOrder)
 			// Can pass key with host byte-order fields, as it will get
 			// converted to network byte-order.
 			err := e.PolicyMap.DeleteKey(keyHostOrder)
@@ -2720,6 +2721,7 @@ func (e *Endpoint) syncPolicyMap() error {
 
 	for keyToAdd, entry := range e.desiredMapState {
 		if oldEntry, ok := e.realizedMapState[keyToAdd]; !ok || oldEntry != entry {
+			e.getLogger().Debug("adding policyKey: %s", keyToAdd)
 			err := e.PolicyMap.AllowKey(keyToAdd, entry.ProxyPort)
 			if err != nil {
 				e.getLogger().WithError(err).Errorf("Failed to add PolicyMap key %s %d", keyToAdd.String(), entry.ProxyPort)

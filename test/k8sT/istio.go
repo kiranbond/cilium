@@ -74,9 +74,9 @@ var _ = Describe("K8sIstioTest", func() {
 		// do not provide curl.
 		wgetCommand = fmt.Sprintf("wget --tries=2 --connect-timeout %d", helpers.CurlConnectTimeout)
 
-		kubectl          *helpers.Kubectl
-		microscopeCancel = func() error { return nil }
-		uptimeCancel     context.CancelFunc
+		kubectl *helpers.Kubectl
+		// microscopeCancel = func() error { return nil }
+		uptimeCancel context.CancelFunc
 	)
 
 	pullImage := func(vmName, imageName string) {
@@ -87,8 +87,8 @@ var _ = Describe("K8sIstioTest", func() {
 
 	detailsSignalChan := make(chan struct{})
 	ratingsSignalChan := make(chan struct{})
-	detailsTicker := time.NewTicker(2 * time.Second)
-	ratingsTicker := time.NewTicker(2 * time.Second)
+	detailsTicker := time.NewTicker(10 * time.Second)
+	ratingsTicker := time.NewTicker(10 * time.Second)
 
 	BeforeAll(func() {
 		k8sVersion := helpers.GetCurrentK8SEnv()
@@ -108,13 +108,13 @@ var _ = Describe("K8sIstioTest", func() {
 
 		ProvisionInfraPods(kubectl)
 
-		By("Disabling debug mode for Istio test")
-		err := kubectl.CiliumExecAll("cilium config Debug=Disabled")
-		Expect(err).To(BeNil(), "unable to set cilium configuration to Debug=Disabled")
+		//By("Disabling debug mode for Istio test")
+		//err := kubectl.CiliumExecAll("cilium config Debug=Disabled")
+		//Expect(err).To(BeNil(), "unable to set cilium configuration to Debug=Disabled")
 
-		By("Setting medium monitor aggregation for Istio test")
-		err = kubectl.CiliumExecAll("cilium config MonitorAggregationLevel=Medium")
-		Expect(err).To(BeNil(), "unable to set cilium configuration to MonitorAggregationLevel=Medium")
+		//By("Setting medium monitor aggregation for Istio test")
+		//err = kubectl.CiliumExecAll("cilium config MonitorAggregationLevel=Medium")
+		//Expect(err).To(BeNil(), "unable to set cilium configuration to MonitorAggregationLevel=Medium")
 
 		By("Creating the istio-system namespace")
 		res := kubectl.NamespaceCreate(istioSystemNamespace)
@@ -127,7 +127,7 @@ var _ = Describe("K8sIstioTest", func() {
 		// Ignore one-time jobs and Prometheus. All other pods in the
 		// namespaces have an "istio" label.
 		By("Waiting for Istio pods to be ready")
-		err = kubectl.WaitforPods(istioSystemNamespace, "-l istio", 300)
+		err := kubectl.WaitforPods(istioSystemNamespace, "-l istio", 300)
 		Expect(err).To(BeNil(),
 			"Istio pods are not ready after timeout in namespace %q", istioSystemNamespace)
 
@@ -152,18 +152,21 @@ var _ = Describe("K8sIstioTest", func() {
 		By("Deleting the istio-system namespace")
 		_ = kubectl.NamespaceDelete(istioSystemNamespace)
 
-		By("Enabling debug mode after Istio test")
-		err := kubectl.CiliumExecAll("cilium config Debug=Enabled")
-		Expect(err).To(BeNil(), "unable to set cilium configuration to Debug=Enabled")
+		//By("Enabling debug mode after Istio test")
+		//err := kubectl.CiliumExecAll("cilium config Debug=Enabled")
+		//Expect(err).To(BeNil(), "unable to set cilium configuration to Debug=Enabled")
 
-		By("Setting no monitor aggregation after Istio test")
-		err = kubectl.CiliumExecAll("cilium config MonitorAggregationLevel=None")
-		Expect(err).To(BeNil(), "unable to set cilium configuration to MonitorAggregationLevel=None")
+		//By("Setting no monitor aggregation after Istio test")
+		//err = kubectl.CiliumExecAll("cilium config MonitorAggregationLevel=None")
+		//Expect(err).To(BeNil(), "unable to set cilium configuration to MonitorAggregationLevel=None")
 
 		kubectl.WaitCleanAllTerminatingPods(600)
 	})
 
+	var hasFailed bool
+
 	AfterFailed(func() {
+		hasFailed = true
 		kubectl.CiliumReport(helpers.KubeSystemNamespace,
 			"cilium endpoint list",
 			"cilium bpf proxy list")
@@ -178,31 +181,34 @@ var _ = Describe("K8sIstioTest", func() {
 			policyPaths       []string
 		)
 
-		ciliumBackgroundInfo := func(backgroundTicker *time.Ticker, signalChan chan struct{}, podLabels string) {
+		_ = func(backgroundTicker *time.Ticker, signalChan chan struct{}, podLabels string) {
 			go func(signalChan chan struct{}) {
+				By("Starting ciliumBackgroundInfo")
 				defer fmt.Println("exiting gofunc")
 				defer GinkgoRecover()
 				var getPodsErr error
 				var pods []string
 				var ciliumPod string
-				// Only care about k8s2 because that's where endpoints keep going into
-				// not ready state.
 				ciliumPodK8s1, err := kubectl.GetCiliumPodOnNode(helpers.KubeSystemNamespace, helpers.K8s1)
 				Expect(err).To(BeNil(), "unable to get cilium pods")
 				ciliumPodK8s2, err := kubectl.GetCiliumPodOnNode(helpers.KubeSystemNamespace, helpers.K8s2)
 				Expect(err).To(BeNil(), "unable to get cilium pods")
-				for getPodsErr != nil || len(pods) == 0 {
+				for getPodsErr != nil || len(pods) == 0 && !hasFailed {
 					pods, getPodsErr = kubectl.GetPodNames(helpers.DefaultNamespace, podLabels)
 					time.Sleep(time.Millisecond * 500)
 					if getPodsErr != nil || len(pods) == 0 {
-						By("Pod with labels %s doesn't exist yet", podLabels)
+						By("Pod with labels %s doesn't exist yet: getPodsErr: %s, len(pods): %d", podLabels, getPodsErr, len(pods))
 					}
+					time.Sleep(time.Millisecond * 500)
+				}
+				if hasFailed {
+					return
 				}
 				By("Checking number of pods with labels %s", podLabels)
 				Expect(len(pods)).To(Equal(1), "unexpected number of pods with label %s", podLabels)
 				var desiredEp *models.Endpoint
 				skipOut := false
-				for !skipOut {
+				for !skipOut && !hasFailed {
 					By("Checking if cilium endpoint for pod with labels %s is plumbed", podLabels)
 					var endpointsK8s1 []models.Endpoint
 					_ = kubectl.CiliumEndpointsList(ciliumPodK8s1).Unmarshal(&endpointsK8s1)
@@ -237,6 +243,10 @@ var _ = Describe("K8sIstioTest", func() {
 					}
 				}
 
+				if hasFailed {
+					return
+				}
+
 				Expect(desiredEp).ToNot(BeNil(), "desired endpoint model is nil")
 				detailsEpID := desiredEp.ID
 				cmds := []string{fmt.Sprintf("cilium bpf policy get %d --numeric", detailsEpID)}
@@ -259,15 +269,16 @@ var _ = Describe("K8sIstioTest", func() {
 
 		BeforeAll(func() {
 			var err error
-			err, microscopeCancel = kubectl.MicroscopeStart()
-			Expect(err).To(BeNil(), "Microscope cannot be started")
+			// err, microscopeCancel = kubectl.MicroscopeStart()
+			// Expect(err).To(BeNil(), "Microscope cannot be started")
 
 			uptimeCancel, err = kubectl.BackgroundReport("uptime")
 			Expect(err).To(BeNil(), "Cannot start background report process")
 		})
 
-		AfterAll(func() {
-			Expect(microscopeCancel()).To(BeNil(), "Cannot stop microscope")
+		JustAfterEach(func() {
+			kubectl.CheckNoPodRestarts()
+			//Expect(microscopeCancel()).To(BeNil(), "Cannot stop microscope")
 			uptimeCancel()
 
 			kubectl.ValidateNoErrorsInLogs(CurrentGinkgoTestDescription().Duration)
@@ -297,8 +308,8 @@ var _ = Describe("K8sIstioTest", func() {
 				Expect(err).Should(BeNil(), "Unable to create policy %q", policyPath)
 			}
 
-			ciliumBackgroundInfo(detailsTicker, detailsSignalChan, "app=details,version=1")
-			ciliumBackgroundInfo(ratingsTicker, ratingsSignalChan, "app=ratings,version=1")
+			//ciliumBackgroundInfo(detailsTicker, detailsSignalChan, "app=details,version=v1")
+			//ciliumBackgroundInfo(ratingsTicker, ratingsSignalChan, "app=ratings,version=v1")
 
 			resourceYAMLPaths = []string{bookinfoV2YAML, bookinfoV1YAML}
 			for _, resourcePath := range resourceYAMLPaths {
@@ -400,7 +411,7 @@ var _ = Describe("K8sIstioTest", func() {
 			// next resources to reduce the load on the next pod creations,
 			// in order to reduce the probability of regeneration timeout.
 			By("Waiting for Bookinfo pods to be ready")
-			err = kubectl.WaitforPods(helpers.DefaultNamespace, "-l zgroup=bookinfo", helpers.HelperTimeout)
+			err = kubectl.WaitforPods(helpers.DefaultNamespace, "-l zgroup=bookinfo", 600)
 			Expect(err).Should(BeNil(), "Pods are not ready after timeout")
 
 			By("Waiting for Bookinfo endpoints to be ready")
