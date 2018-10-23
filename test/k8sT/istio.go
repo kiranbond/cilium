@@ -85,8 +85,10 @@ var _ = Describe("K8sIstioTest", func() {
 		res.ExpectSuccess("unable to pull image %q onto node %q", imageName, vmName)
 	}
 
-	signalChan := make(chan struct{})
-	ticker := time.NewTicker(2 * time.Second)
+	detailsSignalChan := make(chan struct{})
+	ratingsSignalChan := make(chan struct{})
+	detailsTicker := time.NewTicker(2 * time.Second)
+	ratingsTicker := time.NewTicker(2 * time.Second)
 
 	BeforeAll(func() {
 		k8sVersion := helpers.GetCurrentK8SEnv()
@@ -176,8 +178,7 @@ var _ = Describe("K8sIstioTest", func() {
 			policyPaths       []string
 		)
 
-		ciliumBackgroundInfo := func(signalChan chan struct{}) {
-
+		ciliumBackgroundInfo := func(backgroundTicker *time.Ticker, signalChan chan struct{}, podLabels string) {
 			go func(signalChan chan struct{}) {
 				defer fmt.Println("exiting gofunc")
 				defer GinkgoRecover()
@@ -191,25 +192,25 @@ var _ = Describe("K8sIstioTest", func() {
 				ciliumPodK8s2, err := kubectl.GetCiliumPodOnNode(helpers.KubeSystemNamespace, helpers.K8s2)
 				Expect(err).To(BeNil(), "unable to get cilium pods")
 				for getPodsErr != nil || len(pods) == 0 {
-					pods, getPodsErr = kubectl.GetPodNames(helpers.DefaultNamespace, "app=details,version=v1")
+					pods, getPodsErr = kubectl.GetPodNames(helpers.DefaultNamespace, podLabels)
 					time.Sleep(time.Millisecond * 500)
 					if getPodsErr != nil || len(pods) == 0 {
-						By("Details pod doesn't exist yet")
+						By("Pod with labels %s doesn't exist yet", podLabels)
 					}
 				}
-				By("Checking number of details pods")
-				Expect(len(pods)).To(Equal(1), "unexpected number of details pods")
-				var detailsEp *models.Endpoint
+				By("Checking number of pods with labels %s", podLabels)
+				Expect(len(pods)).To(Equal(1), "unexpected number of pods with label %s", podLabels)
+				var desiredEp *models.Endpoint
 				skipOut := false
 				for !skipOut {
-					By("Checking if cilium endpoint for details pod is plumbed")
+					By("Checking if cilium endpoint for pod with labels %s is plumbed", podLabels)
 					var endpointsK8s1 []models.Endpoint
 					_ = kubectl.CiliumEndpointsList(ciliumPodK8s1).Unmarshal(&endpointsK8s1)
 					for _, ep := range endpointsK8s1 {
 						By("Checking if pod name %s contains %s", ep.Status.ExternalIdentifiers.PodName, pods[0])
 						if strings.Contains(ep.Status.ExternalIdentifiers.PodName, pods[0]) {
-							By("pod name %s contains %s; setting detailsEp with endpoint ID %d in cilium pod %s", ep.Status.ExternalIdentifiers.PodName, pods[0], ep.ID, ciliumPodK8s1)
-							detailsEp = &ep
+							By("pod name %s contains %s; setting desiredEp with endpoint ID %d in cilium pod %s", ep.Status.ExternalIdentifiers.PodName, pods[0], ep.ID, ciliumPodK8s1)
+							desiredEp = &ep
 							skipOut = true
 							ciliumPod = ciliumPodK8s1
 							break
@@ -224,8 +225,8 @@ var _ = Describe("K8sIstioTest", func() {
 					for _, ep := range endpointsK8s2 {
 						By("Checking if pod name %s contains %s", ep.Status.ExternalIdentifiers.PodName, pods[0])
 						if strings.Contains(ep.Status.ExternalIdentifiers.PodName, pods[0]) {
-							By("pod name %s contains %s; setting detailsEp with endpoint ID %d in cilium pod %s", ep.Status.ExternalIdentifiers.PodName, pods[0], ep.ID, ciliumPodK8s2)
-							detailsEp = &ep
+							By("pod name %s contains %s; setting desiredEp with endpoint ID %d in cilium pod %s", ep.Status.ExternalIdentifiers.PodName, pods[0], ep.ID, ciliumPodK8s2)
+							desiredEp = &ep
 							skipOut = true
 							ciliumPod = ciliumPodK8s2
 							break
@@ -236,16 +237,16 @@ var _ = Describe("K8sIstioTest", func() {
 					}
 				}
 
-				Expect(detailsEp).ToNot(BeNil(), "details endpoint model is nil")
-				detailsEpID := detailsEp.ID
-				cmds := []string{fmt.Sprintf("cilium bpf policy get %d --numeric", detailsEpID), "cilium bpf ipcache list"}
+				Expect(desiredEp).ToNot(BeNil(), "desired endpoint model is nil")
+				detailsEpID := desiredEp.ID
+				cmds := []string{fmt.Sprintf("cilium bpf policy get %d --numeric", detailsEpID)}
 				By("running commands now")
 				for {
 					select {
 					case <-signalChan:
-						fmt.Println("received signalChan!")
+						fmt.Println("received signal on channel!!")
 						return
-					case <-ticker.C:
+					case <-backgroundTicker.C:
 						for _, cmd := range cmds {
 							By("Executing command: %s", cmd)
 							res := kubectl.ExecPodCmd(helpers.KubeSystemNamespace, ciliumPod, cmd)
@@ -296,7 +297,8 @@ var _ = Describe("K8sIstioTest", func() {
 				Expect(err).Should(BeNil(), "Unable to create policy %q", policyPath)
 			}
 
-			ciliumBackgroundInfo(signalChan)
+			ciliumBackgroundInfo(detailsTicker, detailsSignalChan, "app=details,version=1")
+			ciliumBackgroundInfo(ratingsTicker, ratingsSignalChan, "app=ratings,version=1")
 
 			resourceYAMLPaths = []string{bookinfoV2YAML, bookinfoV1YAML}
 			for _, resourcePath := range resourceYAMLPaths {
@@ -307,8 +309,10 @@ var _ = Describe("K8sIstioTest", func() {
 		})
 
 		AfterEach(func() {
-			ticker.Stop()
-			close(signalChan)
+			detailsTicker.Stop()
+			ratingsTicker.Stop()
+			close(detailsSignalChan)
+			close(ratingsSignalChan)
 			for _, resourcePath := range resourceYAMLPaths {
 
 				By("Deleting resource in file %q", resourcePath)
